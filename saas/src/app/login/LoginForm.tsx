@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Mail, Lock, Globe } from "lucide-react";
@@ -11,6 +11,32 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { auth, googleProvider } = await import("@/lib/firebase-client");
+      const { getRedirectResult } = await import("firebase/auth");
+
+      const result = await getRedirectResult(auth);
+      if (!result) return;
+
+      setLoading(true);
+      const idToken = await result.user.getIdToken();
+      const signInResult = await signIn("firebase", {
+        idToken,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        setError("Erro ao autenticar com Google");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    })();
+  }, [router]);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,26 +65,11 @@ export function LoginForm() {
 
     try {
       const { auth, googleProvider } = await import("@/lib/firebase-client");
-      const { signInWithPopup } = await import("firebase/auth");
+      const { signInWithRedirect } = await import("firebase/auth");
 
-      const result = await signInWithPopup(auth, googleProvider);
-      const idToken = await result.user.getIdToken();
-
-      const signInResult = await signIn("firebase", {
-        idToken,
-        redirect: false,
-      });
-
-      if (signInResult?.error) {
-        setError("Erro ao autenticar com Google");
-        setLoading(false);
-        return;
-      }
-
-      router.push("/dashboard");
-      router.refresh();
+      await signInWithRedirect(auth, googleProvider);
     } catch {
-      setError("Erro ao conectar com Google. Verifique se popups estão habilitados.");
+      setError("Erro ao conectar com Google. Tente novamente.");
       setLoading(false);
     }
   }
@@ -94,6 +105,7 @@ export function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="seu@email.com"
               required
+              autoComplete="email"
               className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
             />
           </div>
@@ -109,6 +121,7 @@ export function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
+              autoComplete="current-password"
               className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
             />
           </div>
